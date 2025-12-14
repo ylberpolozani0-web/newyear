@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2026 new year</title>
+    <link rel="stylesheet" href="loading.css">
+</head>
+<body>
+    <canvas id="galaxy" class="galaxy-canvas"></canvas>
+
+    <div class="wrapper">
+        <div class="countdown" id="countdown"></div>
+        <div class="progress-container">
+            <div class="line">
+                <div class="fill" id="fill"></div>
+            </div>
+            <div class="percentage" id="percentage">0%</div>
+        </div>
+    </div>
+
+    <script>
+        
+
+        // Galaxy Background
+        const canvas = document.getElementById('galaxy');
+        const ctx = canvas.getContext('2d');
+        
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        let stars = [];
+        let particles = [];
+        let fireworkParticles = [];
+        let mouseX = canvas.width / 2;
+        let mouseY = canvas.height / 2;
+        let touchX = canvas.width / 2;
+        let touchY = canvas.height / 2;
+
+        // Planets data - only Moon
+        const planets = [
+            { x: 1200, y: 150, size: 25, color: '#e8e8e8', glow: '#b0b0b0', speed: 0.1, orbitAngle: 0 }
+        ];
+
+        function createStars() {
+            for (let i = 0; i < 200; i++) {
+                stars.push({
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height,
+                    radius: Math.random() * 2,
+                    opacity: Math.random() * 0.5 + 0.5,
+                    twinkleSpeech: Math.random() * 0.03 + 0.01
+                });
+            }
+        }
+
+        function drawGalaxy(offset) {
+            ctx.fillStyle = 'rgba(10, 10, 20, 1)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Galaxy glow
+            const gradient = ctx.createRadialGradient(canvas.width / 2, canvas.height / 2, 100, canvas.width / 2, canvas.height / 2, 400);
+            gradient.addColorStop(0, 'rgba(100, 50, 150, 0.1)');
+            gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw and animate stars
+            stars.forEach(star => {
+                star.opacity += star.twinkleSpeech;
+                if (star.opacity > 1 || star.opacity < 0.3) {
+                    star.twinkleSpeech *= -1;
+                }
+
+                ctx.fillStyle = `rgba(255, 255, 255, ${star.opacity})`;
+                ctx.beginPath();
+                ctx.arc(star.x, star.y, star.radius, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Move stars slowly
+                star.x -= 0.1;
+                if (star.x < 0) star.x = canvas.width;
+            });
+
+            // Draw nebula clouds
+            for (let i = 0; i < 3; i++) {
+                ctx.fillStyle = `rgba(150, 100, 200, ${0.05 + Math.sin(offset / 100 + i) * 0.02})`;
+                ctx.beginPath();
+                ctx.arc(canvas.width / 2 + Math.sin(offset / 200 + i) * 100, canvas.height / 2, 150 + Math.sin(offset / 300) * 50, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        function drawPlanets(offset) {
+            planets.forEach(planet => {
+                planet.orbitAngle += planet.speed;
+
+                ctx.shadowColor = planet.glow;
+                ctx.shadowBlur = 15;
+                ctx.shadowOffsetX = 0;
+                ctx.shadowOffsetY = 0;
+
+                // Draw subtle moon glow
+                ctx.fillStyle = planet.glow;
+                ctx.globalAlpha = 0.15;
+                ctx.beginPath();
+                ctx.arc(planet.x, planet.y, planet.size + 12, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.globalAlpha = 0.25;
+                ctx.beginPath();
+                ctx.arc(planet.x, planet.y, planet.size + 6, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Draw moon
+                ctx.globalAlpha = 0.7;
+                ctx.fillStyle = planet.color;
+                ctx.beginPath();
+                ctx.arc(planet.x, planet.y, planet.size, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Subtle moon craters
+                ctx.fillStyle = 'rgba(100, 100, 100, 0.3)';
+                for (let i = 0; i < 2; i++) {
+                    ctx.beginPath();
+                    ctx.arc(
+                        planet.x + Math.cos(planet.orbitAngle + i) * (planet.size * 0.5),
+                        planet.y + Math.sin(planet.orbitAngle + i) * (planet.size * 0.5),
+                        planet.size * 0.2,
+                        0,
+                        Math.PI * 2
+                    );
+                    ctx.fill();
+                }
+
+                ctx.globalAlpha = 1;
+            });
+            ctx.shadowColor = 'transparent';
+        }
+
+        function drawFireworks() {
+            fireworkParticles = fireworkParticles.filter(p => p.life > 0);
+            
+            fireworkParticles.forEach(p => {
+                p.vx *= 0.98;
+                p.vy *= 0.98;
+                p.vy += 0.15;
+                p.x += p.vx;
+                p.y += p.vy;
+                p.life -= 0.012;
+
+                ctx.fillStyle = `hsla(${p.hue}, 100%, 50%, ${p.life})`;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.shadowColor = `hsla(${p.hue}, 100%, 50%, ${p.life * 0.5})`;
+                ctx.shadowBlur = 10;
+            });
+            ctx.shadowColor = 'transparent';
+        }
+
+        let fireworksTriggered = false;
+
+        function createFireworks() {
+            for (let burst = 0; burst < 40; burst++) {
+                setTimeout(() => {
+                    const x = Math.random() * canvas.width;
+                    const y = Math.random() * (canvas.height * 0.7);
+                    createBurst(x, y);
+                }, burst * 80);
+            }
+        }
+
+        function createBurst(x, y) {
+            const particleCount = 80;
+            const hue = Math.random() * 360;
+
+            for (let i = 0; i < particleCount; i++) {
+                const angle = (Math.PI * 2 * i) / particleCount;
+                const velocity = 6 + Math.random() * 12;
+
+                fireworkParticles.push({
+                    x: x,
+                    y: y,
+                    vx: Math.cos(angle) * velocity,
+                    vy: Math.sin(angle) * velocity,
+                    life: 1,
+                    hue: hue + (Math.random() * 40 - 20),
+                    size: 2 + Math.random() * 2
+                });
+            }
+        }
+
+        // Mouse tracking for parallax
+        document.addEventListener('mousemove', (e) => {
+            mouseX = e.clientX;
+            mouseY = e.clientY;
+        });
+
+        // Touch tracking for mobile
+        document.addEventListener('touchmove', (e) => {
+            if (e.touches.length > 0) {
+                touchX = e.touches[0].clientX;
+                touchY = e.touches[0].clientY;
+            }
+        });
+
+        createStars();
+        let galaxyOffset = 0;
+        function animateGalaxy() {
+            galaxyOffset++;
+            
+            // Parallax offset based on mouse/touch
+            const parallaxX = (mouseX || touchX) / canvas.width - 0.5;
+            const parallaxY = (mouseY || touchY) / canvas.height - 0.5;
+
+            // Apply parallax to planets
+            planets.forEach(planet => {
+                planet.x += parallaxX * 0.05;
+                planet.y += parallaxY * 0.05;
+            });
+
+            drawGalaxy(galaxyOffset);
+            drawPlanets(galaxyOffset);
+            drawFireworks();
+            requestAnimationFrame(animateGalaxy);
+        }
+        animateGalaxy();
+
+        // Countdown and Progress
+        function updateCountdown() {
+            const now = new Date();
+            const newYear2026 = new Date('2026-01-01T00:00:00').getTime();
+            const distance = newYear2026 - now.getTime();
+
+            const days = Math.floor(distance / (1000 * 60 * 60 * 24));
+            const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+            const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+            const seconds = Math.floor((distance % (1000 * 60)) / 1000);
+
+            const currentDay = now.getDate();
+            const progress = currentDay * (100 / 30);
+            const progressRounded = Math.round(progress);
+
+            document.getElementById("countdown").innerHTML = 
+                days + "d " + hours + "h " + minutes + "m " + seconds + "s";
+
+            document.getElementById("fill").style.width = progress + "%";
+            document.getElementById("percentage").innerHTML = progressRounded + "%";
+
+            if ((distance < 0 || progressRounded >= 100) && !fireworksTriggered) {
+                fireworksTriggered = true;
+                document.getElementById("countdown").innerHTML = "🎉 2026! 🎉";
+                document.getElementById("fill").style.width = "100%";
+                document.getElementById("percentage").innerHTML = "100%";
+                createFireworks();
+            }
+        }
+
+        updateCountdown();
+        setInterval(updateCountdown, 1000);
+
+        // Resize canvas on window resize
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        });
+    </script>
+
+</body>
+</html>
